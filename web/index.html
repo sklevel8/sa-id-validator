@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#061311" />
+  <meta name="description" content="Validate South African ID numbers in the browser: Luhn checksum, date of birth, gender and citizenship, with a full digit-by-digit breakdown." />
+  <title>SA ID Validator — 13-digit identity number checker</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="app.css" />
+  <link rel="stylesheet" href="theme.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="shell topbar__inner">
+      <a class="brand" href="./" aria-label="SA ID Validator home">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="5" width="18" height="14" rx="2.5"/>
+            <circle cx="9" cy="11" r="2.2"/>
+            <path d="M5.8 16.4c.6-1.5 1.8-2.2 3.2-2.2s2.6.7 3.2 2.2M14.5 10h4M14.5 13h2.5" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="brand__name">SA ID <span>Validator</span></span>
+        <span class="brand__tag">13 digits</span>
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#check" class="is-active">Validate</a>
+        <a href="#batch">Batch</a>
+        <a href="#reference">Reference</a>
+        <span class="nav__divider" aria-hidden="true"></span>
+        <a href="https://github.com/sklevel8/sa-id-validator" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="shell page">
+    <section class="hero hero--single" id="check">
+      <div>
+        <div class="eyebrow"><span class="eyebrow__dot"></span> Runs entirely in your browser</div>
+        <h1>Check a South African <span>ID number.</span></h1>
+        <p class="lede">
+          Paste a 13-digit identity number. We verify the Luhn checksum, resolve the birth date
+          against a 120-year plausibility window, and decode gender and citizenship — without
+          sending the number anywhere.
+        </p>
+      </div>
+    </section>
+
+    <div class="validator-layout">
+      <section class="card validator-card">
+        <div class="card__head">
+          <div>
+            <h2 class="card__title">Identity number</h2>
+            <p class="card__hint">Digits only — spaces and dashes are ignored.</p>
+          </div>
+          <button class="btn btn--sm btn--ghost" type="button" id="sampleBtn">Try a sample</button>
+        </div>
+
+        <div class="field">
+          <label class="field__label sr-only" for="idInput">South African ID number</label>
+          <input id="idInput" class="id-input mono" type="text" inputmode="numeric" autocomplete="off"
+            spellcheck="false" maxlength="20" placeholder="0000000000000" aria-describedby="idHelp" />
+        </div>
+
+        <div class="segments" id="segments" aria-label="ID number structure" role="group"></div>
+
+        <div class="row" style="margin-top:18px; justify-content:space-between">
+          <span class="tiny dim" id="idHelp">Structure: YYMMDD · SSSS · C · A · Z</span>
+          <button class="btn btn--sm btn--ghost" type="button" id="clearBtn">Clear</button>
+        </div>
+
+        <div id="verdict" class="verdict" hidden>
+          <div class="verdict__head">
+            <span id="verdictBadge" class="badge"></span>
+            <span class="tiny dim mono" id="verdictCode"></span>
+          </div>
+          <p class="verdict__text" id="verdictText"></p>
+        </div>
+
+        <div id="reasonBox" class="alert alert--bad" role="alert" hidden></div>
+      </section>
+
+      <section class="card breakdown-card" id="breakdown">
+        <div class="card__head">
+          <div>
+            <h2 class="card__title">Decoded attributes</h2>
+            <p class="card__hint">Everything below is derived from the number itself.</p>
+          </div>
+          <span class="badge">offline</span>
+        </div>
+
+        <dl class="facts">
+          <div><dt>Date of birth</dt><dd id="factDob">—</dd></div>
+          <div><dt>Age</dt><dd id="factAge">—</dd></div>
+          <div><dt>Gender</dt><dd id="factGender">—</dd></div>
+          <div><dt>Citizenship</dt><dd id="factCitizen">—</dd></div>
+          <div><dt>Checksum</dt><dd id="factChecksum">—</dd></div>
+          <div><dt>Sequence</dt><dd id="factSequence" class="mono">—</dd></div>
+        </dl>
+
+        <div class="checksum" id="checksumPanel">
+          <h3 class="h3">Luhn walkthrough</h3>
+          <p class="tiny dim">The rightmost payload digit is doubled, then every second digit moving left.</p>
+          <div class="checksum__digits" id="checksumDigits"></div>
+          <div class="checksum__sum">
+            <span class="dim tiny">Sum of transformed digits</span>
+            <strong class="mono" id="checksumSum">—</strong>
+            <span class="dim tiny">expected check digit</span>
+            <strong class="mono" id="checksumExpected">—</strong>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="section" id="batch">
+      <div class="section__head">
+        <div>
+          <h2 class="h2">Batch validation</h2>
+          <p class="section__desc">One number per line, up to 500. Results are downloadable as CSV.</p>
+        </div>
+        <div class="row">
+          <button class="btn btn--sm btn--ghost" type="button" id="exportBtn">Export CSV</button>
+          <button class="btn btn--sm btn--primary" type="button" id="batchBtn">Validate list</button>
+        </div>
+      </div>
+
+      <div class="grid grid--sidebar">
+        <div class="card">
+          <label class="field__label" for="batchInput">Paste ID numbers</label>
+          <textarea id="batchInput" class="textarea mono" rows="9" placeholder="8001015009087&#10;9202204720082&#10;0304155678081"></textarea>
+          <div class="row" style="margin-top:12px; justify-content:space-between">
+            <span class="tiny dim" id="batchCount">0 lines</span>
+            <span class="tiny dim">Nothing leaves this tab.</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="h3">Summary</h3>
+          <div class="batch-stats">
+            <div><span class="stat__value" id="bTotal">0</span><span class="dim tiny">checked</span></div>
+            <div><span class="stat__value ok" id="bValid">0</span><span class="dim tiny">valid</span></div>
+            <div><span class="stat__value bad" id="bInvalid">0</span><span class="dim tiny">rejected</span></div>
+          </div>
+          <div class="stack" style="margin-top:16px">
+            <button class="btn btn--ghost btn--block" type="button" id="generateBtn">Generate a valid test ID</button>
+            <p class="tiny dim">Uses a random birth date, sequence and citizenship digit, then computes the correct Luhn check digit.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card--flush" style="margin-top:16px">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Number</th><th>Result</th><th>Date of birth</th><th>Gender</th><th>Citizenship</th><th>Detail</th></tr>
+            </thead>
+            <tbody id="batchRows"></tbody>
+          </table>
+        </div>
+        <div id="batchEmpty" class="empty"><strong>No batch results yet</strong><span>Paste numbers above and validate.</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="reference">
+      <div class="section__head">
+        <div>
+          <h2 class="h2">Anatomy of a 13-digit ID</h2>
+          <p class="section__desc">The same rules implemented in <code class="mono">src/utils/validator.py</code>.</p>
+        </div>
+      </div>
+
+      <div class="grid grid--3 anatomy">
+        <article class="card"><span class="anatomy__code mono">YYMMDD</span><h3 class="h3">Date of birth</h3><p class="muted small">Century is omitted. Both 19YY and 20YY are tested and the younger plausible date wins.</p></article>
+        <article class="card"><span class="anatomy__code mono">SSSS</span><h3 class="h3">Gender sequence</h3><p class="muted small">0000–4999 is recorded as female, 5000–9999 as male.</p></article>
+        <article class="card"><span class="anatomy__code mono">C</span><h3 class="h3">Citizenship</h3><p class="muted small">0 = South African citizen. 1 = permanent resident. Any other digit is rejected.</p></article>
+        <article class="card"><span class="anatomy__code mono">A</span><h3 class="h3">Legacy digit</h3><p class="muted small">Historically a race classification. Currently 8 or 9 and unused by modern systems.</p></article>
+        <article class="card"><span class="anatomy__code mono">Z</span><h3 class="h3">Luhn check digit</h3><p class="muted small">Modulus-10 checksum over the first twelve digits. Catches transpositions and typos.</p></article>
+        <article class="card card--accent"><span class="anatomy__code mono">120 yrs</span><h3 class="h3">Plausibility window</h3><p class="muted small">Future dates and ages beyond 120 years are rejected as implausible.</p></article>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer__inner">
+        <span>Built by Sipho Makubalo · pure validation, no data collection.</span>
+        <div class="row row--tight">
+          <a href="https://github.com/sklevel8/sa-id-validator" target="_blank" rel="noopener">Source</a>
+          <span class="dim">·</span>
+          <a href="https://sklevel8-portfolio.netlify.app" target="_blank" rel="noopener">All projects</a>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
