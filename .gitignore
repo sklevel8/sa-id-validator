@@ -10,4 +10,4 @@ venv/
 Thumbs.db
 .idea/
 .vscode/
-
+.netlify/
